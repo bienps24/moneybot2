@@ -34,11 +34,12 @@ logger = logging.getLogger(__name__)
 BOT_TOKEN       = os.environ["BOT_TOKEN"]
 ADMIN_ID         = int(os.environ.get("ADMIN_ID", "0"))
 CHANNEL_ID      = int(os.environ["CHANNEL_ID"])
-CHANNEL_LINK     = os.environ.get("CHANNEL_LINK", "https://t.me/+YLDFGnamQXRjODll")
-PAYMENT_LINK    = os.environ.get("PAYMENT_LINK", "https://t.me/your_payment_bot")
+CHANNEL_LINK     = os.environ.get("CHANNEL_LINK", "https://t.me/+HOEKfYwHGx03NDNl")
+PAYMENT_LINK    = os.environ.get("PAYMENT_LINK", "http://t.me/ipaygatewaybot/pay")
 VIDEO_1_ID      = os.environ.get("VIDEO_1_ID", "")
 VIDEO_2_ID      = os.environ.get("VIDEO_2_ID", "")
-EXTRA_VIDEO_IDS = os.environ.get("EXTRA_VIDEO_IDS", "").split(",")
+VIDEO_3_ID      = os.environ.get("VIDEO_3_ID", "")
+VIDEO_4_ID      = os.environ.get("VIDEO_4_ID", "")
 
 VIDEO_DELETE_DELAY = 20    # 20 seconds
 CHAT_DELETE_DELAY  = 1200  # 20 minutes
@@ -64,28 +65,31 @@ async def schedule_delete(bot, chat_id: int, message_ids: list, delay: int):
             pass
 
 # ── SEND VIDEOS + BUTTONS ─────────────────────────────────────────────────────
+async def send_media_group_safe(bot, chat_id, state, videos, label):
+    from telegram import InputMediaVideo
+    media = [InputMediaVideo(media=v, protect_content=True) for v in videos if v]
+    if not media:
+        if ADMIN_ID:
+            await bot.send_message(chat_id=ADMIN_ID, text="WARNING: " + label + " videos not set!")
+        return []
+    try:
+        msgs = await bot.send_media_group(chat_id=chat_id, media=media, protect_content=True)
+        ids = [m.message_id for m in msgs]
+        state["messages"].extend(ids)
+        logger.info(label + " sent to " + str(chat_id))
+        return ids
+    except Exception as e:
+        logger.error(label + " error: " + str(e))
+        if ADMIN_ID:
+            await bot.send_message(chat_id=ADMIN_ID, text="ERROR " + label + ": " + str(e))
+        return []
+
 async def send_content(bot, chat_id: int, uid: int, state: dict):
     video_msgs = []
-
-    for label, vid_id in [("VIDEO_1_ID", VIDEO_1_ID), ("VIDEO_2_ID", VIDEO_2_ID)]:
-        if not vid_id:
-            logger.warning(f"{label} is empty")
-            await bot.send_message(chat_id=ADMIN_ID, text=f"⚠️ {label} not set in Railway Variables!")
-            continue
-        try:
-            msg = await bot.send_video(
-                chat_id=chat_id,
-                video=vid_id,
-                protect_content=True,
-                supports_streaming=True,
-            )
-            video_msgs.append(msg.message_id)
-            state["messages"].append(msg.message_id)
-            logger.info(f"✅ Sent {label} to {chat_id}")
-        except Exception as e:
-            err = f"Video send error {label}: {e}"
-            logger.error(err)
-            await bot.send_message(chat_id=ADMIN_ID, text=f"❌ {err}")
+    # Send Group 1: Video 1 + Video 2 together
+    video_msgs += await send_media_group_safe(bot, chat_id, state, [VIDEO_1_ID, VIDEO_2_ID], "Group1")
+    # Send Group 2: Video 3 + Video 4 together
+    video_msgs += await send_media_group_safe(bot, chat_id, state, [VIDEO_3_ID, VIDEO_4_ID], "Group2")
 
     # Description text + buttons — sent SEPARATELY from videos
     info_msg = await bot.send_message(
@@ -101,7 +105,7 @@ async def send_content(bot, chat_id: int, uid: int, state: dict):
         parse_mode="Markdown",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("📤  SHARE FOR MORE", url=share_url())],
-            [InlineKeyboardButton("💳  PAY FOR ACCESS — ₱999", url=PAYMENT_LINK)],
+            [InlineKeyboardButton("💳  PAY FOR ACCESS — ₱1,499", url=PAYMENT_LINK)],
         ])
     )
     state["messages"].append(info_msg.message_id)
@@ -151,7 +155,7 @@ async def test_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id != ADMIN_ID:
         return
     await update.message.reply_text("🧪 Testing videos...")
-    for label, vid_id in [("VIDEO_1_ID", VIDEO_1_ID), ("VIDEO_2_ID", VIDEO_2_ID)]:
+    for label, vid_id in [("VIDEO_1_ID", VIDEO_1_ID), ("VIDEO_2_ID", VIDEO_2_ID), ("VIDEO_3_ID", VIDEO_3_ID), ("VIDEO_4_ID", VIDEO_4_ID)]:
         if not vid_id:
             await update.message.reply_text(f"❌ {label} is EMPTY in Railway Variables!")
             continue
