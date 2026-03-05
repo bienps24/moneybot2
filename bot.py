@@ -67,7 +67,7 @@ async def schedule_delete(bot, chat_id: int, message_ids: list, delay: int):
 # ── SEND VIDEOS + BUTTONS ─────────────────────────────────────────────────────
 async def send_media_group_safe(bot, chat_id, state, videos, label):
     from telegram import InputMediaVideo
-    media = [InputMediaVideo(media=v, protect_content=True) for v in videos if v]
+    media = [InputMediaVideo(media=v) for v in videos if v]
     if not media:
         if ADMIN_ID:
             await bot.send_message(chat_id=ADMIN_ID, text="WARNING: " + label + " videos not set!")
